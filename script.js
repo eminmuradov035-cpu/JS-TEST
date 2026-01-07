@@ -1,106 +1,77 @@
-const body = document.getElementById('body')
-const emailInput = document.getElementById('emailInput')
-const passwordInput = document.getElementById('passwordInput')
-const buttonInput = document.getElementById('buttonInput')
+const todoContainer = document.getElementById("todoContainer");
+const loadMoreBtn = document.getElementById("loadMoreBtn");
 
-let userData = {}
+const TODOS_PER_LOAD = 8;
+let currentIndex = 0;
+let allTodos = [];
 
-emailInput.addEventListener('input', (e) => {
-    userData = {
-        ...userData,
-        email: e.target.value
-    }
-})
+init();
 
-passwordInput.addEventListener('input', (e) => {
-    userData = {
-        ...userData, 
-        password: e.target.value
-    }
-})
+async function init() {
+  const cachedTodos = sessionStorage.getItem("todos");
 
-const signInRequest = async () => {
-    try {
-        console.log('Login send:', userData);
-
-        const res = await fetch('https://ilkinibadov.com/api/b/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(userData)
-        })
-
-        console.log('Response status:', res.status)
-
-        if (!res.ok) {
-            throw new Error('Login failed')
-        }
-
-        const data = await res.json()
-        
-        console.log(data)
-
-        const token = data.token || data.accessToken || data.access_token
-        const refreshToken = data.refreshToken || data.refresh_token
-
-        if (token) {
-            localStorage.setItem('accessToken', token)
-            sessionStorage.setItem('accessToken', token)
-
-            if (refreshToken) {
-                localStorage.setItem('refreshToken', refreshToken)
-                sessionStorage.setItem('refreshToken', refreshToken)
-            }
-
-        } else {
-            alert('Token not received')
-        }
-
-    } catch (error) {
-        console.error('Login error:', error.message)
-        alert('Email or password is incorrect!')
-    }
-}
-
-buttonInput.addEventListener('click', () => {
-    console.log('Button Clicked!');
-    signInRequest()
-})
-
-
-const darkmodeBtn = document.getElementById("darkmodeBtn")
-
-darkmodeBtn.addEventListener("click", () => {
-
-  const darkmode = localStorage.getItem("darkmode")
-  localStorage.setItem("darkmode", darkmode === "light" ? "dark" : "light")
-
-  const currentMode = localStorage.getItem("darkmode")
-  console.log(currentMode);
-
-  const body = document.getElementById("body")
-
-  if (currentMode === "light") {
-    body.classList.remove("bg-slate-900", "text-white")
-    body.classList.add("bg-white", "text-black")
-  } else {
-    body.classList.remove("bg-white", "text-black")
-    body.classList.add("bg-slate-900", "text-white")
+  if (cachedTodos) {
+    console.log("Loaded from SessionStorage");
+    allTodos = JSON.parse(cachedTodos);
+    renderNextTodos();
+    return;
   }
 
-})
+  try {
+    console.log("Pulling from API");
+    const res = await fetch("https://jsonplaceholder.typicode.com/todos");
+    const data = await res.json();
 
-window.addEventListener("DOMContentLoaded", () => {
-    const savedMode = localStorage.getItem("darkmode") || "light"
-  
-    const body = document.getElementById("body")
-  
-    if (savedMode === "light") {
-      body.classList.remove("bg-slate-900", "text-white")
-      body.classList.add("bg-white", "text-black")
-    } else {
-      body.classList.remove("bg-white", "text-black")
-      body.classList.add("bg-slate-900", "text-white")
-    }
-  })
+    sessionStorage.setItem("todos", JSON.stringify(data));
+    allTodos = data;
+    renderNextTodos();
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderNextTodos() {
+  const nextTodos = allTodos.slice(
+    currentIndex,
+    currentIndex + TODOS_PER_LOAD
+  );
+
+  nextTodos.forEach(todo => {
+    const div = document.createElement("div");
+
+    div.className = `
+      bg-white p-4 rounded-xl shadow
+      flex flex-col gap-2
+      hover:scale-[1.02] transition 
+      shadow-xl hover:shadow-2xl
+      hover:shadow-green-500
+    `;
+
+    div.innerHTML = `
+      <h3 class="font-semibold text-gray-800">#${todo.id}</h3>
+      <p class="text-sm text-gray-600">${todo.title}</p>
+      <span class="text-xs font-medium mt-auto ${
+        todo.completed
+          ? "text-green-600 bg-green-100"
+          : "text-yellow-600 bg-yellow-100"
+      } px-2 py-1 rounded w-fit">
+        ${todo.completed ? "Completed" : "Pending"}
+      </span>
+    `;
+
+    div.addEventListener("click", () => {
+      window.location.href = `details.html?id=${todo.id}`;
+    });
+
+    todoContainer.appendChild(div);
+  });
+
+  currentIndex += TODOS_PER_LOAD;
+
+  if (currentIndex >= allTodos.length) {
+    loadMoreBtn.classList.add("hidden");
+  }
+}
+
+loadMoreBtn.addEventListener("click", renderNextTodos);
